@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>암모니아 생성 시뮬레이션</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family:'Malgun Gothic',sans-serif;
+  background:#ffe0f0;
+  color:#4a004a;
+  overflow:hidden;
+  height:100vh;
+}
+.scene { display:none; width:100vw; height:100vh; position:relative; }
+.scene.active { display:flex; flex-direction:column; align-items:center; }
+
+/* 네비 버튼 */
+.nav-btn {
+  position:absolute; bottom:22px; right:36px;
+  background:linear-gradient(135deg,#ff6eb4,#ff3d9a);
+  color:white; border:none; padding:11px 26px;
+  border-radius:25px; font-size:15px; cursor:pointer;
+  box-shadow:0 4px 18px rgba(255,61,154,0.45);
+  transition:transform .2s,box-shadow .2s; z-index:100;
+}
+.nav-btn:hover{transform:scale(1.06);box-shadow:0 6px 24px rgba(255,61,154,0.65);}
+
+/* ============ SCENE 1 ============ */
+#scene1 {
+  background:linear-gradient(160deg,#fff0f8 0%,#ffd6ee 60%,#ffb3df 100%);
+  overflow-y:auto;
+}
+.s1-inner {
+  display:flex; flex-direction:column; align-items:center;
+  width:100%; padding:18px 20px 80px;
+}
+.scene1-title {
+  font-size:24px; font-weight:bold; color:#c2006e;
+  text-shadow:0 2px 8px rgba(255,100,180,.3); letter-spacing:1px;
+}
+.reaction-box {
+  margin-top:12px;
+  background:linear-gradient(135deg,#fff0f8,#ffe4f4);
+  border:2.5px solid #ff69b4; border-radius:16px;
+  padding:12px 32px; font-size:21px; color:#a8005c;
+  letter-spacing:3px; font-weight:bold;
+  box-shadow:0 4px 20px rgba(255,105,180,.25);
+}
+.molecules-row {
+  margin-top:18px; display:flex; gap:28px;
+  justify-content:center; flex-wrap:wrap;
+}
+.mol-card {
+  background:linear-gradient(160deg,rgba(255,255,255,.92),rgba(255,220,240,.75));
+  border:2px solid rgba(255,105,180,.4); border-radius:20px;
+  padding:16px 20px; display:flex; flex-direction:column;
+  align-items:center; gap:8px; min-width:168px; cursor:pointer;
+  box-shadow:0 6px 24px rgba(255,105,180,.2);
+  transition:transform .25s,box-shadow .25s;
+  position:relative;
+}
+.mol-card:hover{transform:translateY(-7px) scale(1.03);box-shadow:0 12px 32px rgba(255,105,180,.45);}
+.mol-card .click-hint {
+  font-size:10px; color:#ff69b4; opacity:.7;
+  position:absolute; bottom:8px; right:10px;
+}
+.mol-label{font-size:15px;color:#b0005a;font-weight:bold;}
+.mol-shape{font-size:11px;color:#e0408a;background:rgba(255,105,180,.12);padding:3px 10px;border-radius:10px;}
+
+/* 분자 팝업 */
+.mol-popup-overlay {
+  position:fixed; inset:0;
+  background:rgba(100,0,60,.35);
+  backdrop-filter:blur(4px);
+  z-index:300; display:flex; align-items:center; justify-content:center;
+  animation:fadeIn .2s ease;
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.mol-popup {
+  background:linear-gradient(160deg,#fff0f8,#ffe4f4);
+  border:2px solid #ff69b4; border-radius:24px;
+  padding:28px 32px; max-width:500px; width:90%;
+  box-shadow:0 16px 48px rgba(255,61,154,.35);
+  animation:popIn .35s cubic-bezier(.175,.885,.32,1.275);
+  position:relative;
+}
+@keyframes popIn{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+.mol-popup h2{color:#c2006e;font-size:20px;margin-bottom:14px;text-align:center;}
+.mol-popup .popup-close {
+  position:absolute; top:14px; right:18px;
+  background:#ff69b4; color:white; border:none;
+  width:30px; height:30px; border-radius:50%;
+  font-size:16px; cursor:pointer; font-weight:bold;
+  transition:background .2s;
+}
+.mol-popup .popup-close:hover{background:#c2006e;}
+.popup-info-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;}
+.popup-info-table td{padding:7px 10px;border-bottom:1px solid rgba(255,105,180,.25);}
+.popup-info-table td:first-child{color:#c2006e;font-weight:bold;width:42%;}
+.popup-info-table td:last-child{color:#4a004a;}
+.popup-svg-wrap{display:flex;justify-content:center;margin:14px 0 8px;}
+
+/* ── AI 질문 박스 ── */
+.ai-box {
+  margin-top:18px; width:100%; max-width:720px;
+  background:linear-gradient(160deg,rgba(255,255,255,.88),rgba(255,220,240,.7));
+  border:2px solid #ff69b4; border-radius:20px;
+  padding:16px 20px;
+  box-shadow:0 6px 24px rgba(255,105,180,.2);
+}
+.ai-box-title{font-size:15px;font-weight:bold;color:#c2006e;margin-bottom:10px;}
+.ai-input-row{display:flex;gap:8px;}
+.ai-input {
+  flex:1; padding:10px 14px; border-radius:14px;
+  border:1.5px solid #ff69b4; font-size:13px;
+  font-family:'Malgun Gothic',sans-serif;
+  background:rgba(255,255,255,.9); color:#4a004a;
+  outline:none; transition:border-color .2s;
+}
+.ai-input:focus{border-color:#c2006e;}
+.ai-send-btn {
+  background:linear-gradient(135deg,#ff6eb4,#ff3d9a);
+  color:white; border:none; padding:10px 18px;
+  border-radius:14px; font-size:13px; cursor:pointer;
+  font-family:'Malgun Gothic',sans-serif;
+  box-shadow:0 3px 12px rgba(255,61,154,.4);
+  transition:transform .2s; white-space:nowrap;
+}
+.ai-send-btn:hover{transform:scale(1.05);}
+.ai-send-btn:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+.ai-answer {
+  margin-top:12px; padding:12px 14px;
+  background:rgba(255,255,255,.75); border-radius:14px;
+  border-left:4px solid #ff69b4;
+  font-size:13px; line-height:1.85; color:#4a004a;
+  min-height:36px; max-height:220px; overflow-y:auto;
+  white-space:pre-wrap;
+}
+.ai-answer.loading{color:#cc6699;font-style:italic;}
+.ai-answer.error{color:#c2006e;}
+
+/* API 키 입력 */
+.api-key-row{display:flex;gap:8px;margin-bottom:10px;align-items:center;}
+.api-key-input{
+  flex:1; padding:8px 12px; border-radius:12px;
+  border:1.5px solid #ffb3d9; font-size:12px;
+  background:rgba(255,255,255,.8); color:#4a004a;
+  outline:none; font-family:'Malgun Gothic',sans-serif;
+}
+.api-key-input:focus{border-color:#ff69b4;}
+.api-key-label{font-size:11px;color:#cc6699;white-space:nowrap;}
+
+/* 빠른 질문 태그 */
+.quick-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.quick-tag{
+  background:rgba(255,105,180,.15); border:1px solid rgba(255,105,180,.4);
+  color:#c2006e; padding:4px 10px; border-radius:12px;
+  font-size:11px; cursor:pointer; transition:background .2s;
+}
+.quick-tag:hover{background:rgba(255,105,180,.35);}
+
+/* ============ SCENE 2 ============ */
+#scene2{background:linear-gradient(160deg,#fff0f8 0%,#ffd6ee 60%,#ffb3df 100%);}
+.scene2-title{margin-top:16px;font-size:21px;font-weight:bold;color:#c2006e;}
+.scene2-sub{font-size:12px;color:#cc5599;margin-top:4px;margin-bottom:6px;}
+
+#game-area {
+  position:relative; width:900px; height:505px;
+  background:linear-gradient(160deg,rgba(255,255,255,.65),rgba(255,220,240,.45));
+  border:2px solid rgba(255,105,180,.35); border-radius:22px;
+  overflow:hidden; box-shadow:0 8px 32px rgba(255,105,180,.2);
+}
+
+/* 진행바 */
+#progress-bar-wrap{
+  position:absolute;top:11px;left:50%;transform:translateX(-50%);
+  width:270px;background:rgba(255,105,180,.15);border-radius:10px;
+  height:17px;border:1.5px solid rgba(255,105,180,.4);overflow:hidden;
+}
+#progress-bar{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,#ff6eb4,#ff3d9a);
+  transition:width .4s;border-radius:10px;
+  box-shadow:0 0 8px rgba(255,61,154,.5);
+}
+#progress-text{position:absolute;top:34px;left:50%;transform:translateX(-50%);font-size:12px;color:#c2006e;white-space:nowrap;font-weight:bold;}
+#counter-display{position:absolute;top:56px;left:50%;transform:translateX(-50%);font-size:12px;color:#e060a0;white-space:nowrap;}
+
+/* 드래그 분자 */
+.drag-mol{
+  position:absolute;cursor:grab;user-select:none;z-index:10;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  filter:drop-shadow(0 4px 8px rgba(255,61,154,.3));transition:filter .2s;
+}
+.drag-mol:hover{filter:drop-shadow(0 6px 14px rgba(255,61,154,.6));}
+.drag-mol:active{cursor:grabbing;}
+.drag-mol .dlabel{
+  font-size:10px;color:#c2006e;font-weight:bold;pointer-events:none;
+  background:rgba(255,255,255,.75);padding:1px 6px;border-radius:6px;
+}
+.drag-mol svg{pointer-events:none;}
+
+/* 연기 */
+.smoke{
+  position:absolute;border-radius:50%;
+  background:radial-gradient(circle,rgba(200,230,255,.7),rgba(150,200,255,.15));
+  animation:smokeUp 2s ease-out forwards;pointer-events:none;z-index:20;
+}
+@keyframes smokeUp{
+  0%{transform:translateY(0) scale(.4);opacity:.85;}
+  100%{transform:translateY(-200px) scale(3.5);opacity:0;}
+}
+
+/* 결과 */
+#result-area{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  display:none;flex-direction:column;align-items:center;gap:8px;
+  z-index:30;
+  animation:popIn2 .7s cubic-bezier(.175,.885,.32,1.275) both;
+  background:linear-gradient(160deg,rgba(255,255,255,.97),rgba(255,210,240,.97));
+  border:2px solid rgba(255,105,180,.55);border-radius:22px;
+  padding:18px 28px;
+  box-shadow:0 12px 44px rgba(255,61,154,.3);
+}
+@keyframes popIn2{
+  0%{transform:translate(-50%,-50%) scale(0);opacity:0;}
+  100%{transform:translate(-50%,-50%) scale(1);opacity:1;}
+}
+.res-title{font-size:17px;font-weight:bold;color:#c2006e;}
+.res-sub{font-size:12px;color:#e060a0;}
+
+#reset-btn{
+  position:absolute;bottom:22px;left:36px;
+  background:linear-gradient(135deg,#ffb3d9,#ff6eb4);
+  color:white;border:none;padding:10px 20px;border-radius:20px;
+  font-size:13px;cursor:pointer;
+  box-shadow:0 4px 14px rgba(255,105,180,.4);z-index:100;
+}
+#reset-btn:hover{transform:scale(1.05);}
+
+.flash-overlay{
+  position:fixed;inset:0;
+  background:radial-gradient(circle,rgba(200,230,255,.8),rgba(150,200,255,.3));
+  opacity:0;pointer-events:none;z-index:999;
+  animation:flashAnim .5s ease-out;
+}
+@keyframes flashAnim{0%{opacity:.7}100%{opacity:0}}
+
+/* 통 내부 분자 표시 */
+#bucket-molecules{
+  position:absolute;bottom:52px;left:50%;transform:translateX(-50%);
+  width:165px;height:110px;
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:3px;
+  z-index:6;overflow:hidden;
+}
+.bucket-mol-icon{display:flex;flex-direction:column;align-items:center;animation:dropIn .3s ease-out;}
+@keyframes dropIn{0%{transform:translateY(-12px) scale(.5);opacity:0;}100%{transform:translateY(0) scale(1);opacity:1;}}
+.bucket-mol-icon span{font-size:8px;color:#c2006e;font-weight:bold;background:rgba(255,255,255,.75);border-radius:4px;padding:0 3px;}
+</style>
+</head>
+<body>
+
+<!-- ===================== SCENE 1 ===================== -->
+<div id="scene1" class="scene active">
+<div class="s1-inner">
+
+  <div class="scene1-title">🌸 암모니아(NH₃) 생성 반응 시뮬레이션</div>
+
+  <div class="reaction-box">3H₂(g) &nbsp;+&nbsp; N₂(g) &nbsp;→&nbsp; 2NH₃(g)</div>
+
+  <div class="molecules-row">
+
+    <!-- 수소 H2 -->
+    <div class="mol-card" onclick="showMolPopup('H2')">
+      <svg width="120" height="62" viewBox="0 0 120 62">
+        <defs>
+          <radialGradient id="hg1" cx="35%" cy="30%" r="65%">
+            <stop offset="0%" stop-color="#b3e5fc"/>
+            <stop offset="50%" stop-color="#29b6f6"/>
+            <stop offset="100%" stop-color="#0277bd"/>
+          </radialGradient>
+          <linearGradient id="hbond" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#e3f2fd"/>
+            <stop offset="100%" stop-color="#64b5f6"/>
+          </linearGradient>
+          <filter id="hglow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <rect x="38" y="24" width="44" height="13" rx="6.5" fill="url(#hbond)"/>
+        <circle cx="32" cy="31" r="24" fill="url(#hg1)" filter="url(#hglow)"/>
+        <ellipse cx="24" cy="22" rx="7" ry="4.5" fill="rgba(255,255,255,.38)" transform="rotate(-20,24,22)"/>
+        <text x="32" y="37" text-anchor="middle" fill="white" font-size="15" font-weight="bold" font-family="Arial">H</text>
+        <circle cx="88" cy="31" r="24" fill="url(#hg1)" filter="url(#hglow)"/>
+        <ellipse cx="80" cy="22" rx="7" ry="4.5" fill="rgba(255,255,255,.38)" transform="rotate(-20,80,22)"/>
+        <text x="88" y="37" text-anchor="middle" fill="white" font-size="15" font-weight="bold" font-family="Arial">H</text>
+      </svg>
+      <div class="mol-label">수소 H₂</div>
+      <div class="mol-shape">🔗 직선형 · 단일결합</div>
+      <div class="click-hint">👆 클릭해서 자세히 보기</div>
+    </div>
+
+    <!-- 질소 N2 -->
+    <div class="mol-card" onclick="showMolPopup('N2')">
+      <svg width="130" height="65" viewBox="0 0 130 65">
+        <defs>
+          <radialGradient id="ng1" cx="35%" cy="30%" r="65%">
+            <stop offset="0%" stop-color="#e1bee7"/>
+            <stop offset="50%" stop-color="#9c27b0"/>
+            <stop offset="100%" stop-color="#4a148c"/>
+          </radialGradient>
+          <linearGradient id="ntb" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ce93d8"/>
+            <stop offset="100%" stop-color="#7b1fa2"/>
+          </linearGradient>
+          <filter id="nglow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <rect x="40" y="22" width="50" height="6" rx="3" fill="url(#ntb)" opacity=".9"/>
+        <rect x="40" y="29.5" width="50" height="6" rx="3" fill="url(#ntb)"/>
+        <rect x="40" y="37" width="50" height="6" rx="3" fill="url(#ntb)" opacity=".9"/>
+        <circle cx="34" cy="33" r="26" fill="url(#ng1)" filter="url(#nglow)"/>
+        <ellipse cx="26" cy="23" rx="7.5" ry="5" fill="rgba(255,255,255,.33)" transform="rotate(-20,26,23)"/>
+        <circle cx="12" cy="22" r="3.5" fill="#e1bee7" opacity=".75"/>
+        <circle cx="12" cy="22" r="2" fill="white" opacity=".5"/>
+        <text x="34" y="39" text-anchor="middle" fill="white" font-size="15" font-weight="bold" font-family="Arial">N</text>
+        <circle cx="96" cy="33" r="26" fill="url(#ng1)" filter="url(#nglow)"/>
+        <ellipse cx="88" cy="23" rx="7.5" ry="5" fill="rgba(255,255,255,.33)" transform="rotate(-20,88,23)"/>
+        <circle cx="118" cy="22" r="3.5" fill="#e1bee7" opacity=".75"/>
+        <circle cx="118" cy="22" r="2" fill="white" opacity=".5"/>
+        <text x="96" y="39" text-anchor="middle" fill="white" font-size="15" font-weight="bold" font-family="Arial">N</text>
+      </svg>
+      <div class="mol-label">질소 N₂</div>
+      <div class="mol-shape">🔗 직선형 · 삼중결합</div>
+      <div class="click-hint">👆 클릭해서 자세히 보기</div>
+    </div>
+
+    <!-- 암모니아 NH3 -->
+    <div class="mol-card" onclick="showMolPopup('NH3')">
+      <svg width="145" height="118" viewBox="0 0 145 118">
+        <defs>
+          <radialGradient id="nbig" cx="35%" cy="30%" r="65%">
+            <stop offset="0%" stop-color="#e1bee7"/>
+            <stop offset="50%" stop-color="#9c27b0"/>
+            <stop offset="100%" stop-color="#4a148c"/>
+          </radialGradient>
+          <radialGradient id="hsmall" cx="35%" cy="30%" r="65%">
+            <stop offset="0%" stop-color="#b3e5fc"/>
+            <stop offset="50%" stop-color="#29b6f6"/>
+            <stop offset="100%" stop-color="#0277bd"/>
+          </radialGradient>
+          <filter id="nhglow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <line x1="72" y1="36" x2="28" y2="82" stroke="#b39ddb" stroke-width="6" stroke-linecap="round" opacity=".7"/>
+        <line x1="72" y1="36" x2="72" y2="88" stroke="#b39ddb" stroke-width="6" stroke-linecap="round" opacity=".7"/>
+        <line x1="72" y1="36" x2="116" y2="82" stroke="#b39ddb" stroke-width="6" stroke-linecap="round" opacity=".7"/>
+        <line x1="72" y1="36" x2="28" y2="82" stroke="rgba(255,255,255,.35)" stroke-width="2" stroke-linecap="round"/>
+        <line x1="72" y1="36" x2="72" y2="88" stroke="rgba(255,255,255,.35)" stroke-width="2" stroke-linecap="round"/>
+        <line x1="72" y1="36" x2="116" y2="82" stroke="rgba(255,255,255,.35)" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="22" cy="90" r="18" fill="url(#hsmall)" filter="url(#nhglow)"/>
+        <ellipse cx="16" cy="82" rx="5.5" ry="3.5" fill="rgba(255,255,255,.35)" transform="rotate(-20,16,82)"/>
+        <text x="22" y="96" text-anchor="middle" fill="white" font-size="12" font-weight="bold" font-family="Arial">H</text>
+        <circle cx="72" cy="98" r="18" fill="url(#hsmall)" filter="url(#nhglow)"/>
+        <ellipse cx="66" cy="90" rx="5.5" ry="3.5" fill="rgba(255,255,255,.35)" transform="rotate(-20,66,90)"/>
+        <text x="72" y="104" text-anchor="middle" fill="white" font-size="12" font-weight="bold" font-family="Arial">H</text>
+        <circle cx="122" cy="90" r="18" fill="url(#hsmall)" filter="url(#nhglow)"/>
+        <ellipse cx="116" cy="82" rx="5.5" ry="3.5" fill="rgba(255,255,255,.35)" transform="rotate(-20,116,82)"/>
+        <text x="122" y="96" text-anchor="middle" fill="white" font-size="12" font-weight="bold" font-family="Arial">H</text>
+        <circle cx="72" cy="28" r="24" fill="url(#nbig)" filter="url(#nhglow)"/>
+        <ellipse cx="63" cy="18" rx="9" ry="5.5" fill="rgba(255,255,255,.35)" transform="rotate(-20,63,18)"/>
+        <ellipse cx="72" cy="8" rx="8" ry="4" fill="#e1bee7" opacity=".7"/>
+        <text x="72" y="34" text-anchor="middle" fill="white" font-size="15" font-weight="bold" font-family="Arial">N</text>
+        <path d="M52 50 A16 16 0 0 1 72 54" fill="none" stroke="rgba(255,150,200,.8)" stroke-width="1.5" stroke-dasharray="3,2"/>
+        <text x="42" y="64" fill="#e060a0" font-size="9">107°</text>
+      </svg>
+      <div class="mol-label">암모니아 NH₃</div>
+      <div class="mol-shape">⛰️ 삼각뿔형 · 107°</div>
+      <div class="click-hint">👆 클릭해서 자세히 보기</div>
+    </div>
+
+  </div><!-- molecules-row -->
+
+  <!-- ── AI 질문 박스 ── -->
+  <div class="ai-box">
+    <div class="ai-box-title">🤖 AI 화학 선생님께 질문하기</div>
+    <div class="api-key-row">
+      <span class="api-key-label">🔑 Claude API Key:</span>
+      <input class="api-key-input" id="apiKeyInput" type="password"
+             placeholder="sk-ant-api03-... 입력 후 질문하세요"/>
+    </div>
+    <div class="ai-input-row">
+      <input class="ai-input" id="aiQuestion"
+             placeholder="예) 암모니아가 삼각뿔형인 이유가 뭐야?"
+             onkeydown="if(event.key==='Enter')sendAI()"/>
+      <button class="ai-send-btn" id="aiSendBtn" onclick="sendAI()">✈️ 질문!</button>
+    </div>
+    <div class="quick-tags">
+      <span class="quick-tag" onclick="quickQ('하버-보슈법이 뭐야?')">하버-보슈법이 뭐야?</span>
+      <span class="quick-tag" onclick="quickQ('삼중결합이 왜 안정적이야?')">삼중결합이 왜 안정적이야?</span>
+      <span class="quick-tag" onclick="quickQ('고립전자쌍이 뭐야?')">고립전자쌍이 뭐야?</span>
+      <span class="quick-tag" onclick="quickQ('결합각이 왜 107도야?')">결합각이 왜 107도야?</span>
+      <span class="quick-tag" onclick="quickQ('암모니아가 극성분자인 이유?')">극성분자인 이유?</span>
+    </div>
+    <div class="ai-answer" id="aiAnswer">👆 API 키를 입력하고 궁금한 게 있으면 질문해봐! 화학 선생님이 바로 답해줄게 🌸</div>
+  </div>
+
+</div><!-- s1-inner -->
+  <button class="nav-btn" onclick="goScene(2)">🧪 직접 실험하기 →</button>
+</div><!-- scene1 -->
+
+<!-- ===================== SCENE 2 ===================== -->
+<div id="scene2" class="scene">
+  <div class="scene2-title">🌸 암모니아 만들기 실험실</div>
+  <div class="scene2-sub">분자 모형을 드래그해서 플라스크 안에 넣어보세요! 💕 필요: H₂ × 3개, N₂ × 1개</div>
+
+  <div id="game-area">
+    <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+    <div id="progress-text">플라스크에 넣은 분자: 0 / 4</div>
+    <div id="counter-display">H₂: 0/3 &nbsp;&nbsp; N₂: 0/1</div>
+
+    <!-- 과학실 플라스크 (에를렌마이어 플라스크) -->
+    <svg id="bucket" style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:185px;height:195px;z-index:5;" viewBox="0 0 185 195">
+      <defs>
+        <linearGradient id="flaskBody" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="rgba(200,240,255,0.55)"/>
+          <stop offset="100%" stop-color="rgba(150,210,255,0.30)"/>
+        </linearGradient>
+        <linearGradient id="flaskNeck" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="rgba(180,230,255,0.5)"/>
+          <stop offset="50%" stop-color="rgba(220,245,255,0.7)"/>
+          <stop offset="100%" stop-color="rgba(180,230,255,0.5)"/>
+        </linearGradient>
+        <linearGradient id="liquidGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="rgba(100,200,255,0.35)"/>
+          <stop offset="100%" stop-color="rgba(50,150,255,0.55)"/>
+        </linearGradient>
+        <filter id="glassBlur">
+          <feGaussianBlur stdDeviation="1" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="flaskShadow">
+          <feDropShadow dx="2" dy="6" stdDeviation="8" flood-color="rgba(0,100,200,0.25)"/>
+        </filter>
+        <clipPath id="flaskClip">
+          <path d="M72,6 L72,62 L18,148 Q8,170 18,182 Q30,193 92.5,193 Q155,193 167,182 Q177,170 167,148 L113,62 L113,6 Z"/>
+        </clipPath>
+      </defs>
+
+      <!-- 플라스크 내부 액체/가스 느낌 -->
+      <ellipse cx="92.5" cy="168" rx="62" ry="22" fill="url(#liquidGrad)" clip-path="url(#flaskClip)" opacity="0.6"/>
+
+      <!-- 플라스크 본체 (에를렌마이어) -->
+      <path d="M72,6 L72,62 L18,148 Q8,170 18,182 Q30,193 92.5,193 Q155,193 167,182 Q177,170 167,148 L113,62 L113,6 Z"
+            fill="url(#flaskBody)"
+            stroke="#5bc8f5" stroke-width="2.5"
+            filter="url(#flaskShadow)"/>
+
+      <!-- 유리 두께감 (안쪽 선) -->
+      <path d="M76,8 L76,63 L23,147 Q14,168 23,179 Q34,189 92.5,189 Q151,189 162,179 Q171,168 162,147 L109,63 L109,8"
+            fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.5"/>
+
+      <!-- 눈금선 -->
+      <line x1="38" y1="170" x2="52" y2="170" stroke="rgba(100,180,255,0.8)" stroke-width="1.5"/>
+      <line x1="34" y1="155" x2="48" y2="155" stroke="rgba(100,180,255,0.8)" stroke-width="1.5"/>
+      <line x1="30" y1="140" x2="44" y2="140" stroke="rgba(100,180,255,0.8)" stroke-width="1.5"/>
+      <text x="55" y="173" fill="rgba(80,160,220,0.9)" font-size="9" font-family="Arial">100</text>
+      <text x="51" y="158" fill="rgba(80,160,220,0.9)" font-size="9" font-family="Arial">200</text>
+      <text x="47" y="143" fill="rgba(80,160,220,0.9)" font-size="9" font-family="Arial">300</text>
+
+      <!-- 빛 반사 (왼쪽 하이라이트) -->
+      <path d="M28,130 Q24,155 30,178" stroke="rgba(255,255,255,0.55)" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M80,10 L80,58" stroke="rgba(255,255,255,0.45)" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+      <!-- 목 부분 -->
+      <rect x="70" y="2" width="45" height="64" rx="4"
+            fill="url(#flaskNeck)" stroke="#5bc8f5" stroke-width="2"/>
+      <!-- 목 하이라이트 -->
+      <rect x="75" y="4" width="10" height="60" rx="3"
+            fill="rgba(255,255,255,0.35)"/>
+
+      <!-- 마개 (고무마개) -->
+      <rect x="68" y="0" width="49" height="12" rx="4"
+            fill="#e57373" stroke="#c62828" stroke-width="1.5"/>
+      <rect x="74" y="1" width="8" height="10" rx="2"
+            fill="rgba(255,255,255,0.25)"/>
+
+      <!-- 라벨 스티커 -->
+      <rect x="52" y="162" width="82" height="24" rx="5"
+            fill="rgba(255,255,255,0.75)" stroke="rgba(100,180,255,0.5)" stroke-width="1"/>
+      <text x="93" y="178" text-anchor="middle" fill="#0277bd" font-size="10" font-family="Malgun Gothic" font-weight="bold">반응 플라스크</text>
+
+      <!-- 기포 효과 -->
+      <circle cx="60" cy="152" r="4" fill="rgba(255,255,255,0.4)" stroke="rgba(150,220,255,0.6)" stroke-width="1"/>
+      <circle cx="120" cy="162" r="3" fill="rgba(255,255,255,0.35)" stroke="rgba(150,220,255,0.6)" stroke-width="1"/>
+      <circle cx="85" cy="145" r="2.5" fill="rgba(255,255,255,0.35)" stroke="rgba(150,220,255,0.5)" stroke-width="1"/>
+    </svg>
+
+    <!-- 통 내부 분자 표시 -->
+    <div id="bucket-molecules"></div>
+    <!-- 결과 -->
+    <div id="result-area"></div>
+  </div>
+
+  <button id="reset-btn" onclick="resetScene2()">🔄 다시하기</button>
+  <button class="nav-btn" onclick="goScene(1)">← 1장으로 돌아가기</button>
+</div>
+
+<!-- ===== 분자 팝업 ===== -->
+<div class="mol-popup-overlay" id="molPopupOverlay" style="display:none" onclick="closePopupOutside(event)">
+  <div class="mol-popup" id="molPopup">
+    <button class="popup-close" onclick="closeMolPopup()">✕</button>
+    <h2 id="popupTitle"></h2>
+    <div class="popup-svg-wrap" id="popupSvg"></div>
+    <table class="popup-info-table" id="popupTable"></table>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  씬 전환
+// ============================================================
+function goScene(n){
+  document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+  document.getElementById('scene'+n).classList.add('active');
+  if(n===2) initScene2();
+}
+
+// ============================================================
+//  분자 팝업
+// ============================================================
+const MOL_DATA = {
+  H2:{
+    title:'수소 분자 H₂ 상세 정보',
+    svg:`<svg width="200" height="90" viewBox="0 0 200 90">
+      <defs>
+        <radialGradient id="ph1" cx="32%" cy="28%" r="68%">
+          <stop offset="0%" stop-color="#e1f5fe"/>
+          <stop offset="40%" stop-color="#29b6f6"/>
+          <stop offset="100%" stop-color="#01579b"/>
+        </radialGradient>
+        <linearGradient id="pbond" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#e3f2fd"/>
+          <stop offset="50%" stop-color="#81d4fa"/>
+          <stop offset="100%" stop-color="#0288d1"/>
+        </linearGradient>
+        <filter id="pglow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <rect x="62" y="33" width="76" height="22" rx="11" fill="url(#pbond)"/>
+      <rect x="62" y="33" width="38" height="10" rx="5" fill="rgba(255,255,255,0.3)"/>
+      <circle cx="52" cy="44" r="36" fill="url(#ph1)" filter="url(#pglow)"/>
+      <ellipse cx="38" cy="30" rx="13" ry="8" fill="rgba(255,255,255,0.42)" transform="rotate(-25,38,30)"/>
+      <circle cx="148" cy="44" r="36" fill="url(#ph1)" filter="url(#pglow)"/>
+      <ellipse cx="134" cy="30" rx="13" ry="8" fill="rgba(255,255,255,0.42)" transform="rotate(-25,134,30)"/>
+      <text x="52" y="51" text-anchor="middle" fill="white" font-size="22" font-weight="bold" font-family="Arial">H</text>
+      <text x="148" y="51" text-anchor="middle" fill="white" font-size="22" font-weight="bold" font-family="Arial">H</text>
+      <text x="52" y="72" text-anchor="middle" fill="#0277bd" font-size="10" font-family="Arial">원자번호 1</text>
+      <text x="148" y="72" text-anchor="middle" fill="#0277bd" font-size="10" font-family="Arial">원자번호 1</text>
+      <text x="100" y="22" text-anchor="middle" fill="#666" font-size="10" font-family="Arial">σ결합 (단일)</text>
+    </svg>`,
+    rows:[
+      ['분자식','H₂'],['결합 종류','σ결합 (단일결합)'],['분자 구조','직선형 (180°)'],
+      ['결합 길이','74 pm'],['결합 에너지','436 kJ/mol'],
+      ['극성 여부','무극성 (전기음성도 동일)'],['끓는점','-252.9°C'],['상태 (25°C)','기체'],
+      ['전자 배치','1s¹ + 1s¹ → 공유결합'],
+    ]
+  },
+  N2:{
+    title:'질소 분자 N₂ 상세 정보',
+    svg:`<svg width="210" height="90" viewBox="0 0 210 90">
+      <defs>
+        <radialGradient id="pn1" cx="32%" cy="28%" r="68%">
+          <stop offset="0%" stop-color="#f3e5f5"/>
+          <stop offset="40%" stop-color="#9c27b0"/>
+          <stop offset="100%" stop-color="#4a148c"/>
+        </radialGradient>
+        <linearGradient id="ptb" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f3e5f5"/>
+          <stop offset="50%" stop-color="#ba68c8"/>
+          <stop offset="100%" stop-color="#7b1fa2"/>
+        </linearGradient>
+        <filter id="pnglow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <rect x="64" y="26" width="82" height="9" rx="4.5" fill="url(#ptb)" opacity="0.95"/>
+      <rect x="64" y="38" width="82" height="9" rx="4.5" fill="url(#ptb)"/>
+      <rect x="64" y="50" width="82" height="9" rx="4.5" fill="url(#ptb)" opacity="0.95"/>
+      <circle cx="50" cy="43" r="36" fill="url(#pn1)" filter="url(#pnglow)"/>
+      <ellipse cx="36" cy="29" rx="12" ry="7.5" fill="rgba(255,255,255,0.35)" transform="rotate(-25,36,29)"/>
+      <ellipse cx="22" cy="28" rx="7" ry="4" fill="#e1bee7" opacity="0.8"/>
+      <ellipse cx="22" cy="28" rx="4" ry="2.5" fill="white" opacity="0.5"/>
+      <text x="50" y="50" text-anchor="middle" fill="white" font-size="22" font-weight="bold" font-family="Arial">N</text>
+      <circle cx="160" cy="43" r="36" fill="url(#pn1)" filter="url(#pnglow)"/>
+      <ellipse cx="146" cy="29" rx="12" ry="7.5" fill="rgba(255,255,255,0.35)" transform="rotate(-25,146,29)"/>
+      <ellipse cx="188" cy="28" rx="7" ry="4" fill="#e1bee7" opacity="0.8"/>
+      <ellipse cx="188" cy="28" rx="4" ry="2.5" fill="white" opacity="0.5"/>
+      <text x="160" y="50" text-anchor="middle" fill="white" font-size="22" font-weight="bold" font-family="Arial">N</text>
+      <text x="105" y="16" text-anchor="middle" fill="#666" font-size="10" font-family="Arial">σ + 2π 결합 (삼중)</text>
+      <text x="105" y="78" text-anchor="middle" fill="#888" font-size="9" font-family="Arial">● = 고립전자쌍</text>
+    </svg>`,
+    rows:[
+      ['분자식','N₂'],['결합 종류','삼중결합 (σ+2π)'],['분자 구조','직선형 (180°)'],
+      ['결합 길이','110 pm'],['결합 에너지','945 kJ/mol (매우 안정)'],
+      ['극성 여부','무극성'],['끓는점','-195.8°C'],['상태 (25°C)','기체'],
+      ['고립전자쌍','각 N 원자에 1쌍씩'],['대기 중 비율','약 78%'],
+    ]
+  },
+  NH3:{
+    title:'암모니아 NH₃ 상세 정보',
+    svg:`<svg width="200" height="180" viewBox="0 0 200 180">
+      <defs>
+        <radialGradient id="pnbig" cx="32%" cy="28%" r="68%">
+          <stop offset="0%" stop-color="#f3e5f5"/>
+          <stop offset="40%" stop-color="#9c27b0"/>
+          <stop offset="100%" stop-color="#4a148c"/>
+        </radialGradient>
+        <radialGradient id="phsmall" cx="32%" cy="28%" r="68%">
+          <stop offset="0%" stop-color="#e1f5fe"/>
+          <stop offset="40%" stop-color="#29b6f6"/>
+          <stop offset="100%" stop-color="#01579b"/>
+        </radialGradient>
+        <filter id="pnh3glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <!-- 결합 (굵은 원통형) -->
+      <line x1="100" y1="55" x2="42" y2="130" stroke="#b39ddb" stroke-width="9" stroke-linecap="round"/>
+      <line x1="100" y1="55" x2="100" y2="140" stroke="#b39ddb" stroke-width="9" stroke-linecap="round"/>
+      <line x1="100" y1="55" x2="158" y2="130" stroke="#b39ddb" stroke-width="9" stroke-linecap="round"/>
+      <line x1="100" y1="55" x2="42" y2="130" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
+      <line x1="100" y1="55" x2="100" y2="140" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
+      <line x1="100" y1="55" x2="158" y2="130" stroke="rgba(255,255,255,0.35)" stroke-width="3" stroke-linecap="round"/>
+      <!-- H원자들 -->
+      <circle cx="34" cy="142" r="26" fill="url(#phsmall)" filter="url(#pnh3glow)"/>
+      <ellipse cx="24" cy="131" rx="9" ry="5.5" fill="rgba(255,255,255,0.4)" transform="rotate(-25,24,131)"/>
+      <text x="34" y="149" text-anchor="middle" fill="white" font-size="17" font-weight="bold" font-family="Arial">H</text>
+      <circle cx="100" cy="154" r="26" fill="url(#phsmall)" filter="url(#pnh3glow)"/>
+      <ellipse cx="90" cy="143" rx="9" ry="5.5" fill="rgba(255,255,255,0.4)" transform="rotate(-25,90,143)"/>
+      <text x="100" y="161" text-anchor="middle" fill="white" font-size="17" font-weight="bold" font-family="Arial">H</text>
+      <circle cx="166" cy="142" r="26" fill="url(#phsmall)" filter="url(#pnh3glow)"/>
+      <ellipse cx="156" cy="131" rx="9" ry="5.5" fill="rgba(255,255,255,0.4)" transform="rotate(-25,156,131)"/>
+      <text x="166" y="149" text-anchor="middle" fill="white" font-size="17" font-weight="bold" font-family="Arial">H</text>
+      <!-- N원자 -->
+      <circle cx="100" cy="44" r="34" fill="url(#pnbig)" filter="url(#pnh3glow)"/>
+      <ellipse cx="87" cy="31" rx="13" ry="8" fill="rgba(255,255,255,0.38)" transform="rotate(-25,87,31)"/>
+      <ellipse cx="100" cy="14" rx="12" ry="6" fill="#e1bee7" opacity="0.75"/>
+      <ellipse cx="100" cy="14" rx="7" ry="3.5" fill="white" opacity="0.45"/>
+      <text x="100" y="18" text-anchor="middle" fill="#7b1fa2" font-size="8" font-family="Arial">lone pair</text>
+      <text x="100" y="51" text-anchor="middle" fill="white" font-size="21" font-weight="bold" font-family="Arial">N</text>
+      <!-- 결합각 표시 -->
+      <path d="M72 78 A22 22 0 0 1 100 82" fill="none" stroke="rgba(255,180,220,0.9)" stroke-width="2" stroke-dasharray="4,3"/>
+      <text x="60" y="97" fill="#e060a0" font-size="11" font-family="Arial" font-weight="bold">107°</text>
+    </svg>`,
+    rows:[
+      ['분자식','NH₃'],['결합 종류','N-H 단일결합 × 3'],['분자 구조','삼각뿔형'],
+      ['결합각','107° (고립전자쌍 때문에 109.5°보다 작음)'],
+      ['극성 여부','극성 분자 (쌍극자 모멘트: 1.47 D)'],
+      ['고립전자쌍','N 원자에 1쌍'],['끓는점','-33.4°C'],['상태 (25°C)','기체'],
+      ['용해성','물에 잘 녹음 (수소결합)'],['용도','비료·냉매·세정제'],
+    ]
+  }
+};
+
+function showMolPopup(type){
+  const d=MOL_DATA[type];
+  document.getElementById('popupTitle').textContent=d.title;
+  document.getElementById('popupSvg').innerHTML=d.svg;
+  document.getElementById('popupTable').innerHTML=
+    d.rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+  document.getElementById('molPopupOverlay').style.display='flex';
+}
+function closeMolPopup(){
+  document.getElementById('molPopupOverlay').style.display='none';
+}
+function closePopupOutside(e){
+  if(e.target===document.getElementById('molPopupOverlay')) closeMolPopup();
+}
+
+// ============================================================
+//  AI 질문 (Claude API)
+// ============================================================
+function quickQ(q){
+  document.getElementById('aiQuestion').value=q;
+  sendAI();
+}
+
+async function sendAI(){
+  const key=document.getElementById('apiKeyInput').value.trim();
+  const q=document.getElementById('aiQuestion').value.trim();
+  const ansEl=document.getElementById('aiAnswer');
+  const btn=document.getElementById('aiSendBtn');
+
+  if(!key){
+    ansEl.className='ai-answer error';
+    ansEl.textContent='⚠️ Claude API 키를 먼저 입력해줘! (sk-ant-api03-... 형식)';
+    return;
+  }
+  if(!q){
+    ansEl.className='ai-answer error';
+    ansEl.textContent='⚠️ 질문을 입력해줘!';
+    return;
+  }
+
+  btn.disabled=true;
+  ansEl.className='ai-answer loading';
+  ansEl.textContent='🔄 AI 선생님이 답변 생성 중...';
+
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':key,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-opus-4-5',
+        max_tokens:600,
+        system:`너는 고등학교 2학년 화학을 가르치는 친절한 선생님이야.
+암모니아(NH₃) 생성 반응 시뮬레이션 앱에서 학생들이 질문하고 있어.
+답변 규칙:
+- 고등학교 2학년 수준에 맞게 쉽고 친근하게 설명해줘
+- 너무 길지 않게 핵심만 (4~8줄)
+- 이모지를 적절히 사용해서 친근하게
+- 한국어로 답변해줘
+- 수식이 필요하면 간단하게 표현해`,
+        messages:[{role:'user',content:q}]
+      })
+    });
+
+    if(!res.ok){
+      const err=await res.json();
+      throw new Error(err.error?.message||`HTTP ${res.status}`);
+    }
+    const data=await res.json();
+    ansEl.className='ai-answer';
+    ansEl.textContent=data.content[0].text;
+  }catch(e){
+    ansEl.className='ai-answer error';
+    ansEl.textContent=`❌ 오류 발생: ${e.message}\n\n💡 API 키가 올바른지 확인해봐! (CORS 문제일 경우 서버 환경에서 실행해야 해)`;
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+// ============================================================
+//  SVG 함수들
+// ============================================================
+function svgH2_drag(size){
+  return `<svg width="${size}" height="${size*.7}" viewBox="0 0 90 63">
+    <defs>
+      <radialGradient id="dh_${size}" cx="35%" cy="30%" r="65%">
+        <stop offset="0%" stop-color="#b3e5fc"/>
+        <stop offset="50%" stop-color="#29b6f6"/>
+        <stop offset="100%" stop-color="#0277bd"/>
+      </radialGradient>
+      <filter id="dhg_${size}"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <rect x="30" y="24" width="30" height="12" rx="6" fill="#64b5f6"/>
+    <rect x="30" y="24" width="15" height="6" rx="3" fill="rgba(255,255,255,0.3)"/>
+    <circle cx="25" cy="30" r="22" fill="url(#dh_${size})" filter="url(#dhg_${size})"/>
+    <ellipse cx="17" cy="21" rx="7" ry="4.5" fill="rgba(255,255,255,.4)" transform="rotate(-20,17,21)"/>
+    <text x="25" y="36" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial">H</text>
+    <circle cx="65" cy="30" r="22" fill="url(#dh_${size})" filter="url(#dhg_${size})"/>
+    <ellipse cx="57" cy="21" rx="7" ry="4.5" fill="rgba(255,255,255,.4)" transform="rotate(-20,57,21)"/>
+    <text x="65" y="36" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial">H</text>
+  </svg>`;
+}
+
+function svgN2_drag(size){
+  return `<svg width="${size*1.1}" height="${size*.7}" viewBox="0 0 100 63">
+    <defs>
+      <radialGradient id="dn_${size}" cx="35%" cy="30%" r="65%">
+        <stop offset="0%" stop-color="#e1bee7"/>
+        <stop offset="50%" stop-color="#9c27b0"/>
+        <stop offset="100%" stop-color="#4a148c"/>
+      </radialGradient>
+      <filter id="dng_${size}"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <rect x="32" y="21" width="36" height="6" rx="3" fill="#ce93d8" opacity=".9"/>
+    <rect x="32" y="29" width="36" height="6" rx="3" fill="#9c27b0"/>
+    <rect x="32" y="37" width="36" height="6" rx="3" fill="#ce93d8" opacity=".9"/>
+    <circle cx="26" cy="31" r="22" fill="url(#dn_${size})" filter="url(#dng_${size})"/>
+    <ellipse cx="18" cy="22" rx="7" ry="4.5" fill="rgba(255,255,255,.35)" transform="rotate(-20,18,22)"/>
+    <circle cx="10" cy="20" r="3" fill="#e1bee7" opacity=".8"/>
+    <text x="26" y="37" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial">N</text>
+    <circle cx="74" cy="31" r="22" fill="url(#dn_${size})" filter="url(#dng_${size})"/>
+    <ellipse cx="66" cy="22" rx="7" ry="4.5" fill="rgba(255,255,255,.35)" transform="rotate(-20,66,22)"/>
+    <circle cx="90" cy="20" r="3" fill="#e1bee7" opacity=".8"/>
+    <text x="74" y="37" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial">N</text>
+  </svg>`;
+}
+
+// ── 볼-스틱이 아닌 CPK 스페이스필링 모델 (현실적) ──
+function svgNH3_cpk(size){
+  const s=size/160;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 160 160">
+    <defs>
+      <!-- N 원자 그라데이션 (크고 파란보라) -->
+      <radialGradient id="cpkN" cx="32%" cy="28%" r="70%">
+        <stop offset="0%" stop-color="#f8f0ff"/>
+        <stop offset="25%" stop-color="#ce93d8"/>
+        <stop offset="60%" stop-color="#7b1fa2"/>
+        <stop offset="100%" stop-color="#38006b"/>
+      </radialGradient>
+      <!-- H 원자 그라데이션 (작고 흰회색) -->
+      <radialGradient id="cpkH1" cx="30%" cy="28%" r="72%">
+        <stop offset="0%" stop-color="#ffffff"/>
+        <stop offset="35%" stop-color="#b3e5fc"/>
+        <stop offset="70%" stop-color="#0288d1"/>
+        <stop offset="100%" stop-color="#01579b"/>
+      </radialGradient>
+      <radialGradient id="cpkH2" cx="30%" cy="28%" r="72%">
+        <stop offset="0%" stop-color="#ffffff"/>
+        <stop offset="35%" stop-color="#b3e5fc"/>
+        <stop offset="70%" stop-color="#0288d1"/>
+        <stop offset="100%" stop-color="#01579b"/>
+      </radialGradient>
+      <radialGradient id="cpkH3" cx="30%" cy="28%" r="72%">
+        <stop offset="0%" stop-color="#ffffff"/>
+        <stop offset="35%" stop-color="#b3e5fc"/>
+        <stop offset="70%" stop-color="#0288d1"/>
+        <stop offset="100%" stop-color="#01579b"/>
+      </radialGradient>
+      <filter id="cpkShadow">
+        <feDropShadow dx="2" dy="4" stdDeviation="6" flood-color="rgba(74,0,74,0.4)"/>
+      </filter>
+      <filter id="cpkShadowH">
+        <feDropShadow dx="1" dy="2" stdDeviation="4" flood-color="rgba(1,87,155,0.35)"/>
+      </filter>
+    </defs>
+
+    <!-- H 원자들 (뒤쪽 2개 먼저) -->
+    <!-- 왼쪽 아래 H -->
+    <circle cx="42" cy="112" r="34" fill="url(#cpkH1)" filter="url(#cpkShadowH)"/>
+    <ellipse cx="30" cy="99" rx="12" ry="7" fill="rgba(255,255,255,0.55)" transform="rotate(-30,30,99)"/>
+    <circle cx="35" cy="103" r="4" fill="rgba(255,255,255,0.3)"/>
+    <text x="42" y="119" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="16" font-weight="bold" font-family="Arial">H</text>
+
+    <!-- 오른쪽 아래 H -->
+    <circle cx="118" cy="112" r="34" fill="url(#cpkH2)" filter="url(#cpkShadowH)"/>
+    <ellipse cx="106" cy="99" rx="12" ry="7" fill="rgba(255,255,255,0.55)" transform="rotate(-30,106,99)"/>
+    <circle cx="111" cy="103" r="4" fill="rgba(255,255,255,0.3)"/>
+    <text x="118" y="119" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="16" font-weight="bold" font-family="Arial">H</text>
+
+    <!-- 가운데 아래 H (살짝 앞) -->
+    <circle cx="80" cy="128" r="34" fill="url(#cpkH3)" filter="url(#cpkShadowH)"/>
+    <ellipse cx="68" cy="115" rx="12" ry="7" fill="rgba(255,255,255,0.55)" transform="rotate(-30,68,115)"/>
+    <circle cx="73" cy="119" r="4" fill="rgba(255,255,255,0.3)"/>
+    <text x="80" y="135" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="16" font-weight="bold" font-family="Arial">H</text>
+
+    <!-- N 원자 (가장 앞, 가장 크게) -->
+    <circle cx="80" cy="66" r="52" fill="url(#cpkN)" filter="url(#cpkShadow)"/>
+    <ellipse cx="60" cy="46" rx="20" ry="12" fill="rgba(255,255,255,0.38)" transform="rotate(-30,60,46)"/>
+    <circle cx="64" cy="52" r="7" fill="rgba(255,255,255,0.22)"/>
+    <!-- 고립전자쌍 시각화 (전자 구름) -->
+    <ellipse cx="80" cy="20" rx="18" ry="9" fill="rgba(225,190,231,0.5)" stroke="rgba(206,147,216,0.6)" stroke-width="1.5"/>
+    <ellipse cx="80" cy="20" rx="10" ry="5" fill="rgba(255,255,255,0.3)"/>
+    <text x="80" y="23" text-anchor="middle" fill="#7b1fa2" font-size="8" font-family="Arial" font-weight="bold">lone pair</text>
+    <text x="80" y="72" text-anchor="middle" fill="white" font-size="24" font-weight="bold" font-family="Arial">N</text>
+
+    <!-- 결합각 호 표시 -->
+    <path d="M55 90 A28 28 0 0 1 80 96" fill="none" stroke="rgba(255,200,230,0.85)" stroke-width="2" stroke-dasharray="4,3"/>
+    <text x="43" y="108" fill="#e060a0" font-size="11" font-family="Arial" font-weight="bold">107°</text>
+  </svg>`;
+}
+
+function svgH2_mini(){
+  return `<svg width="40" height="26" viewBox="0 0 90 63">
+    <circle cx="25" cy="30" r="22" fill="#29b6f6"/>
+    <text x="25" y="36" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial">H</text>
+    <rect x="30" y="25" width="30" height="11" rx="5" fill="#64b5f6"/>
+    <circle cx="65" cy="30" r="22" fill="#29b6f6"/>
+    <text x="65" y="36" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial">H</text>
+  </svg>`;
+}
+function svgN2_mini(){
+  return `<svg width="40" height="26" viewBox="0 0 100 63">
+    <circle cx="26" cy="31" r="22" fill="#9c27b0"/>
+    <text x="26" y="37" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial">N</text>
+    <rect x="32" y="26" width="36" height="5" rx="2.5" fill="#ce93d8"/>
+    <rect x="32" y="33" width="36" height="5" rx="2.5" fill="#9c27b0"/>
+    <rect x="32" y="40" width="36" height="5" rx="2.5" fill="#ce93d8"/>
+    <circle cx="74" cy="31" r="22" fill="#9c27b0"/>
+    <text x="74" y="37" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial">N</text>
+  </svg>`;
+}
+
+// ============================================================
+//  Scene 2 드래그 로직
+// ============================================================
+const BUCKET_CX=450, BUCKET_CY=462, BUCKET_R=72;
+let droppedH2=0, droppedN2=0, dragging=null, dragOffX=0, dragOffY=0, reacted=false;
+
+const INIT_POS=[
+  {id:'mol_h2_0',type:'H2',x:48, y:100},
+  {id:'mol_h2_1',type:'H2',x:48, y:240},
+  {id:'mol_h2_2',type:'H2',x:48, y:375},
+  {id:'mol_n2_0',type:'N2',x:750,y:195},
+];
+
+function initScene2(){
+  reacted=false; droppedH2=0; droppedN2=0; dragging=null;
+  const ga=document.getElementById('game-area');
+  ga.querySelectorAll('.drag-mol').forEach(e=>e.remove());
+  ga.querySelectorAll('.smoke').forEach(e=>e.remove());
+  const ra=document.getElementById('result-area');
+  ra.style.display='none'; ra.innerHTML='';
+  document.getElementById('bucket-molecules').innerHTML='';
+  document.getElementById('bucket-molecules').style.opacity='1';
+  updateProgress();
+
+  INIT_POS.forEach(pos=>{
+    const div=document.createElement('div');
+    div.className='drag-mol'; div.id=pos.id;
+    div.dataset.type=pos.type; div.dataset.dropped='0';
+    div.style.left=pos.x+'px'; div.style.top=pos.y+'px';
+    if(pos.type==='H2'){
+      div.innerHTML=svgH2_drag(88)+`<span class="dlabel">H₂ 수소</span>`;
+      div.style.width='88px';
+    }else{
+      div.innerHTML=svgN2_drag(88)+`<span class="dlabel">N₂ 질소</span>`;
+      div.style.width='100px';
+    }
+    ga.appendChild(div);
+  });
+  bindDragEvents();
+}
+
+function bindDragEvents(){
+  document.getElementById('game-area').querySelectorAll('.drag-mol').forEach(m=>{
+    m.addEventListener('mousedown',startDrag);
+    m.addEventListener('touchstart',startDragT,{passive:false});
+  });
+  document.addEventListener('mousemove',onDrag);
+  document.addEventListener('mouseup',endDrag);
+  document.addEventListener('touchmove',onDragT,{passive:false});
+  document.addEventListener('touchend',endDragT);
+}
+
+function gaRect(){return document.getElementById('game-area').getBoundingClientRect();}
+
+function startDrag(e){
+  if(reacted)return;
+  const m=e.currentTarget;
+  if(m.dataset.dropped==='1')return;
+  dragging=m;
+  const r=m.getBoundingClientRect();
+  dragOffX=e.clientX-r.left; dragOffY=e.clientY-r.top;
+  m.style.zIndex=50; e.preventDefault();
+}
+function startDragT(e){
+  if(reacted)return;
+  const m=e.currentTarget;
+  if(m.dataset.dropped==='1')return;
+  dragging=m;
+  const t=e.touches[0],r=m.getBoundingClientRect();
+  dragOffX=t.clientX-r.left; dragOffY=t.clientY-r.top;
+  m.style.zIndex=50; e.preventDefault();
+}
+function onDrag(e){
+  if(!dragging)return;
+  const gr=gaRect();
+  dragging.style.left=(e.clientX-gr.left-dragOffX)+'px';
+  dragging.style.top=(e.clientY-gr.top-dragOffY)+'px';
+}
+function onDragT(e){
+  if(!dragging)return;
+  const t=e.touches[0],gr=gaRect();
+  dragging.style.left=(t.clientX-gr.left-dragOffX)+'px';
+  dragging.style.top=(t.clientY-gr.top-dragOffY)+'px';
+  e.preventDefault();
+}
+function endDrag(){finishDrop();}
+function endDragT(){finishDrop();}
+
+function finishDrop(){
+  if(!dragging)return;
+  const m=dragging; dragging=null;
+  const molW=parseInt(m.style.width)||88;
+  const cx=parseInt(m.style.left)+molW/2;
+  const cy=parseInt(m.style.top)+40;
+  const dx=cx-BUCKET_CX, dy=cy-BUCKET_CY;
+
+  if(Math.sqrt(dx*dx+dy*dy)<BUCKET_R){
+    m.dataset.dropped='1';
+    m.style.cursor='default';
+    m.style.zIndex='4';
+    const tx=BUCKET_CX-molW/2+(Math.random()-.5)*55;
+    const ty=BUCKET_CY-55+(Math.random()-.5)*28;
+    m.style.transition='left .35s ease,top .35s ease,transform .35s ease';
+    m.style.left=tx+'px'; m.style.top=ty+'px';
+    m.style.transform='scale(0.52)';
+    m.style.opacity='1';
+    m.style.filter='drop-shadow(0 2px 5px rgba(2,119,189,0.45))';
+    addBucketIcon(m.dataset.type);
+    if(m.dataset.type==='H2') droppedH2++;
+    else droppedN2++;
+    updateProgress();
+    checkReaction();
+    setTimeout(()=>{m.style.transition='';},400);
+  }else{
+    m.style.zIndex='10';
+  }
+}
+
+function addBucketIcon(type){
+  const bm=document.getElementById('bucket-molecules');
+  const div=document.createElement('div');
+  div.className='bucket-mol-icon';
+  div.innerHTML=(type==='H2'?svgH2_mini():svgN2_mini())+`<span>${type==='H2'?'H₂':'N₂'}</span>`;
+  bm.appendChild(div);
+}
+
+function updateProgress(){
+  const total=droppedH2+droppedN2;
+  document.getElementById('progress-bar').style.width=(total/4*100)+'%';
+  document.getElementById('progress-text').textContent=`플라스크에 넣은 분자: ${total} / 4`;
+  document.getElementById('counter-display').textContent=`H₂: ${droppedH2}/3     N₂: ${droppedN2}/1`;
+}
+
+function checkReaction(){
+  if(droppedH2>=3&&droppedN2>=1&&!reacted){reacted=true;setTimeout(triggerReaction,500);}
+}
+
+function triggerReaction(){
+  const ga=document.getElementById('game-area');
+  // 연기 (청백색 계열 - 화학반응 느낌)
+  for(let i=0;i<32;i++){
+    setTimeout(()=>{
+      const s=document.createElement('div');
+      s.className='smoke';
+      const sz=20+Math.random()*55;
+      s.style.cssText=`width:${sz}px;height:${sz}px;
+        left:${BUCKET_CX-85+Math.random()*170-sz/2}px;
+        top:${BUCKET_CY-60}px;
+        animation-delay:${Math.random()*.45}s;
+        animation-duration:${1.5+Math.random()*.9}s;`;
+      ga.appendChild(s);
+      setTimeout(()=>s.remove(),3200);
+    },i*50);
+  }
+
+  setTimeout(()=>{
+    ga.querySelectorAll('.drag-mol').forEach(m=>{
+      m.style.transition='all .5s ease';
+      m.style.opacity='0';
+      m.style.transform='scale(0) rotate(180deg)';
+    });
+    const bm=document.getElementById('bucket-molecules');
+    bm.style.transition='opacity .5s'; bm.style.opacity='0';
+
+    setTimeout(()=>{
+      const ra=document.getElementById('result-area');
+      // CPK 스페이스필링 모델로 2개의 NH3
+      ra.innerHTML=`
+        <div class="res-title">💥 반응 완료! 암모니아 생성! 🎉</div>
+        <div style="display:flex;gap:18px;justify-content:center;align-items:center;">
+          <div style="text-align:center;">
+            ${svgNH3_cpk(130)}
+            <div style="font-size:12px;color:#c2006e;font-weight:bold;margin-top:2px;">NH₃ #1</div>
+          </div>
+          <div style="font-size:28px;color:#c2006e;">+</div>
+          <div style="text-align:center;">
+            ${svgNH3_cpk(130)}
+            <div style="font-size:12px;color:#c2006e;font-weight:bold;margin-top:2px;">NH₃ #2</div>
+          </div>
+        </div>
+        <div class="res-sub">3H₂ + N₂ → 2NH₃ 반응 성공! 🌸</div>
+        <div style="font-size:11px;color:#9c27b0;margin-top:1px;">
+          CPK 스페이스필링 모델 · 삼각뿔형 · 결합각 107° · 극성분자
+        </div>`;
+      ra.style.display='flex';
+      const fl=document.createElement('div');
+      fl.className='flash-overlay';
+      document.body.appendChild(fl);
+      setTimeout(()=>fl.remove(),600);
+    },650);
+  },1700);
+}
+
+function resetScene2(){
+  document.removeEventListener('mousemove',onDrag);
+  document.removeEventListener('mouseup',endDrag);
+  document.removeEventListener('touchmove',onDragT);
+  document.removeEventListener('touchend',endDragT);
+  initScene2();
+}
+
+window.addEventListener('load',()=>initScene2());
+</script>
+</body>
+</html>
